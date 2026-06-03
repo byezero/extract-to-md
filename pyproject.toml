@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "extract-to-md"
-version = "0.1.0"
+version = "0.2.0"
 description = "A local-first document-to-Markdown extractor with OCR fallbacks."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,6 +28,7 @@ classifiers = [
 
 [project.optional-dependencies]
 markitdown = ["markitdown[all]>=0.1.5"]
+dev = ["pytest>=8"]
 
 [project.urls]
 Homepage = "https://github.com/byezero/extract-to-md"

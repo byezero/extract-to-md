@@ -1,104 +1,181 @@
 # extract-to-md
 
+[中文](README.md) | English
+
 `extract-to-md` is a local-first command-line tool for turning documents into
-Markdown that is convenient for LLM and agent workflows.
+Markdown for LLM and agent workflows.
 
-It uses plain local tools where possible, can call
-[Microsoft MarkItDown](https://github.com/microsoft/markitdown) when it is
-available, and adds OCR-oriented fallbacks for scanned PDFs, image-heavy slide
-decks, and image files.
+It can use [Microsoft MarkItDown](https://github.com/microsoft/markitdown) when
+available, while adding local extraction and OCR fallbacks for PDFs, scanned
+documents, images, PowerPoint decks, and bounded Excel output.
 
-## Features
+## Supported Formats
 
-- Text-like files: Markdown, TXT, CSV, JSON, XML, HTML, YAML
-- Word: extracts body text and tables from `.docx`
-- Excel: extracts `.xlsx` worksheets as Markdown tables
-- PowerPoint: extracts real `.pptx` slide text and speaker notes
-- PowerPoint OCR fallback: renders image-heavy decks through LibreOffice and OCRs them
-- PDF: uses `pdftotext -layout`, then OCRs sparse/scanned PDFs
-- Images: OCRs PNG, JPG, WebP, BMP, and TIFF files with Tesseract
-- MarkItDown fallback: uses `markitdown` for formats not handled directly
+| Type | Behavior | External tools |
+| --- | --- | --- |
+| `.md` / `.txt` / `.csv` / `.json` / `.xml` / `.html` / `.yaml` | Read as text | None |
+| `.docx` | Extract body text and tables; can prefer MarkItDown | Optional `markitdown` |
+| `.xlsx` | Extract worksheets as Markdown tables | None |
+| `.pptx` | Extract real slide text and speaker notes | None |
+| Image-heavy `.pptx` | Render to PDF, then OCR | `soffice`, `pdftoppm`, `tesseract` |
+| Text-layer `.pdf` | Use `pdftotext -layout` | Poppler `pdftotext` |
+| Scanned `.pdf` | Render pages and OCR | Poppler `pdftoppm`, `tesseract` |
+| Images | OCR PNG, JPG, WebP, BMP, and TIFF | `tesseract` |
+| Other MarkItDown-supported formats | Best-effort fallback | Optional `markitdown` |
+
+The default OCR language is `chi_sim+eng`.
 
 ## Install
 
-From this repository:
+### Minimal install
+
+The minimal install only installs this CLI. It does not install MarkItDown,
+Poppler, Tesseract, or LibreOffice.
 
 ```powershell
-uv tool install .
+uv tool install git+https://github.com/byezero/extract-to-md.git
 ```
 
-With MarkItDown support:
+Use this for text files, `.docx`, `.xlsx`, and ordinary `.pptx` files that do
+not need OCR.
+
+### Full local install
+
+On Windows, install the external tools with `winget`:
 
 ```powershell
-uv tool install ".[markitdown]"
+winget install -e --id Python.Python.3.12
+winget install -e --id astral-sh.uv
+winget install -e --id oschwartz10612.Poppler
+winget install -e --id UB-Mannheim.TesseractOCR
+winget install -e --id TheDocumentFoundation.LibreOffice
 ```
 
-From GitHub:
+Then open a new PowerShell and install the CLI with MarkItDown support:
 
 ```powershell
 uv tool install "extract-to-md[markitdown] @ git+https://github.com/byezero/extract-to-md.git"
 ```
 
-## External Tools
+From a local clone:
 
-Some formats require external command-line tools on `PATH`:
+```powershell
+uv tool install ".[markitdown]"
+```
 
-- `pdftotext` and `pdftoppm` from Poppler for PDF text extraction and OCR rendering
-- `tesseract` for image and scanned-PDF OCR
-- `soffice` from LibreOffice for PowerPoint OCR fallback
-- `markitdown` for best-effort conversion of additional formats
+## Diagnose Your Environment
 
-The default OCR language is `chi_sim+eng`.
+Run:
+
+```powershell
+extract-to-md --doctor
+```
+
+It checks:
+
+- the `extract-to-md` package
+- `markitdown`
+- `pdftotext` / `pdftoppm`
+- `tesseract`
+- OCR languages `chi_sim` / `eng`
+- `soffice`
+
+`WARN` means the capability is optional until you convert a file type that needs
+it.
+
+You can also verify commands manually:
+
+```powershell
+python --version
+uv --version
+pdftotext -v
+pdftoppm -v
+tesseract --version
+tesseract --list-langs
+soffice --version
+```
+
+If `chi_sim` is missing, install Simplified Chinese Tesseract language data and
+place `chi_sim.traineddata` in Tesseract's `tessdata` directory.
+
+## macOS Tools
+
+```bash
+brew install python uv poppler tesseract libreoffice
+brew install tesseract-lang
+uv tool install "extract-to-md[markitdown] @ git+https://github.com/byezero/extract-to-md.git"
+extract-to-md --doctor
+```
+
+## Linux Tools
+
+Ubuntu / Debian:
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-pip poppler-utils tesseract-ocr tesseract-ocr-chi-sim libreoffice
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv tool install "extract-to-md[markitdown] @ git+https://github.com/byezero/extract-to-md.git"
+extract-to-md --doctor
+```
 
 ## Usage
 
-Convert a file and print Markdown to stdout:
-
 ```powershell
+extract-to-md --version
 extract-to-md input.pdf
-```
-
-Write to a Markdown file:
-
-```powershell
 extract-to-md input.pdf -o output.md
-```
-
-Force OCR for a PDF:
-
-```powershell
 extract-to-md scanned.pdf --force-ocr -o scanned.md
-```
-
-Use a different Tesseract language:
-
-```powershell
 extract-to-md image.png --lang eng -o image.md
-```
-
-Tune OCR for sparse slide layouts:
-
-```powershell
 extract-to-md deck.pptx --psm 11 -o deck.md
-```
-
-Limit Excel extraction:
-
-```powershell
 extract-to-md workbook.xlsx --max-rows-per-sheet 200 -o workbook.md
 ```
 
-## Relationship to MarkItDown
+## Common Errors
 
-MarkItDown is a strong general-purpose converter. This tool wraps it as one
-possible conversion path, then adds local extraction and OCR decisions that are
-useful for document-heavy agent workflows:
+### Required tool not found: pdftotext
 
-- prefer layout-preserving PDF text extraction before OCR
-- automatically OCR sparse/scanned PDFs
-- OCR images and image-heavy PowerPoint decks with Tesseract
-- keep Excel output bounded for context windows
-- provide a single command with consistent Markdown output
+Install Poppler and reopen your terminal:
+
+```powershell
+winget install -e --id oschwartz10612.Poppler
+pdftotext -v
+```
+
+### Required tool not found: tesseract
+
+Install Tesseract and reopen your terminal:
+
+```powershell
+winget install -e --id UB-Mannheim.TesseractOCR
+tesseract --version
+tesseract --list-langs
+```
+
+### Missing chi_sim.traineddata
+
+Install Simplified Chinese Tesseract language data. `tesseract --list-langs`
+should include both `chi_sim` and `eng`.
+
+### Image-heavy PPTX is not OCRed
+
+Install LibreOffice so `soffice` is available:
+
+```powershell
+winget install -e --id TheDocumentFoundation.LibreOffice
+soffice --version
+```
+
+## Development
+
+```powershell
+git clone https://github.com/byezero/extract-to-md.git
+cd extract-to-md
+python src\extract_to_md\cli.py --help
+python src\extract_to_md\cli.py --doctor
+uv run --extra dev python -m pytest
+uv build
+```
 
 ## License
 
