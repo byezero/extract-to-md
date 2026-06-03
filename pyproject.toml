@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "extract-to-md"
+version = "0.1.0"
+description = "A local-first document-to-Markdown extractor with OCR fallbacks."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "Finn" }
+]
+keywords = ["markdown", "ocr", "pdf", "docx", "pptx", "xlsx", "llm"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Text Processing",
+  "Topic :: Utilities"
+]
+
+[project.optional-dependencies]
+markitdown = ["markitdown[all]>=0.1.5"]
+
+[project.urls]
+Homepage = "https://github.com/byezero/extract-to-md"
+Repository = "https://github.com/byezero/extract-to-md"
+Issues = "https://github.com/byezero/extract-to-md/issues"
+
+[project.scripts]
+extract-to-md = "extract_to_md.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/extract_to_md"]
