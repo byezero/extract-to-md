@@ -8,6 +8,7 @@ from pathlib import Path
 
 INSTALL_HINTS = {
     "markitdown": "Install with: uv tool install 'markitdown[all]'",
+    "pdfinfo": "Install Poppler. Windows: winget install -e --id oschwartz10612.Poppler",
     "pdftotext": "Install Poppler. Windows: winget install -e --id oschwartz10612.Poppler",
     "pdftoppm": "Install Poppler. Windows: winget install -e --id oschwartz10612.Poppler",
     "tesseract": "Install Tesseract OCR. Windows: winget install -e --id UB-Mannheim.TesseractOCR",
@@ -16,6 +17,7 @@ INSTALL_HINTS = {
 
 TOOL_PURPOSES = {
     "markitdown": "best-effort conversion for extra document formats",
+    "pdfinfo": "PDF page counting",
     "pdftotext": "PDF text-layer extraction",
     "pdftoppm": "PDF page rendering for OCR",
     "tesseract": "image and scanned-document OCR",

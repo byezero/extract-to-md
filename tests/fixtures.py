@@ -93,15 +93,50 @@ def write_pptx(path: Path, slide_texts: list[list[str]], notes: list[list[str]] 
 
 
 def write_text_pdf(path: Path, text: str) -> None:
-    escaped = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-    stream = f"BT /F1 18 Tf 72 720 Td ({escaped}) Tj ET".encode("ascii")
+    write_text_pdf_pages(path, [text])
+
+
+def write_text_pdf_pages(path: Path, pages: list[str]) -> None:
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
-        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-        b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream",
     ]
+    page_object_numbers = []
+    content_object_numbers = []
+
+    next_object = 3
+    for text in pages:
+        page_object_numbers.append(next_object)
+        content_object_numbers.append(next_object + 1)
+        next_object += 2
+    font_object_number = next_object
+
+    kids = " ".join(f"{number} 0 R" for number in page_object_numbers)
+    objects.append(f"<< /Type /Pages /Kids [{kids}] /Count {len(pages)} >>".encode("ascii"))
+
+    for page_object_number, content_object_number, text in zip(
+        page_object_numbers,
+        content_object_numbers,
+        pages,
+    ):
+        objects.append(
+            (
+                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+                f"/Resources << /Font << /F1 {font_object_number} 0 R >> >> "
+                f"/Contents {content_object_number} 0 R >>"
+            ).encode("ascii")
+        )
+
+        escaped = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        stream = f"BT /F1 18 Tf 72 720 Td ({escaped}) Tj ET".encode("ascii")
+        objects.append(
+            b"<< /Length "
+            + str(len(stream)).encode("ascii")
+            + b" >>\nstream\n"
+            + stream
+            + b"\nendstream"
+        )
+
+    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
 
     chunks = [b"%PDF-1.4\n"]
     offsets = []

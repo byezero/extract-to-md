@@ -14,6 +14,7 @@ from extract_to_md.extractors import (
     ExtractOptions,
     extract_any,
     extract_docx,
+    extract_pdf,
     extract_pdf_text,
     extract_pptx,
     extract_pptx_with_ocr_fallback,
@@ -21,7 +22,7 @@ from extract_to_md.extractors import (
 )
 from extract_to_md.utils import command_exists
 
-from fixtures import write_docx, write_pptx, write_text_pdf, write_xlsx
+from fixtures import write_docx, write_pptx, write_text_pdf, write_text_pdf_pages, write_xlsx
 
 
 def test_docx_quality_semantics_without_markitdown(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -92,6 +93,83 @@ def test_pdf_text_layer_quality_with_poppler(tmp_path: Path) -> None:
     assert "Quality PDF text layer" in text
 
 
+@pytest.mark.integration
+@pytest.mark.external_tools
+def test_pdf_text_engine_outputs_page_markdown_with_poppler(tmp_path: Path) -> None:
+    if not command_exists("pdftotext") or not command_exists("pdfinfo"):
+        pytest.skip("Poppler tools are not installed")
+    pdf = tmp_path / "pages.pdf"
+    write_text_pdf_pages(pdf, ["First quality page", "Second quality page"])
+
+    text = extract_pdf(pdf, ExtractOptions(pdf_engine="text"))
+
+    assert "<!-- extractor: pdf-text -->" in text
+    assert "<!-- pages: 2 -->" in text
+    assert "<!-- page-methods: 1:text, 2:text -->" in text
+    assert "## Page 1" in text
+    assert "First quality page" in text
+    assert "## Page 2" in text
+    assert "Second quality page" in text
+
+
+def test_pdf_auto_uses_ocr_for_sparse_pages(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    pdf = tmp_path / "mixed.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n%%EOF\n")
+    monkeypatch.setattr("extract_to_md.extractors.pdf_page_count", lambda path: 2)
+    monkeypatch.setattr(
+        "extract_to_md.extractors.extract_pdf_text_pages",
+        lambda path, page_count=None: ["This page has a usable text layer for the agent.", ""],
+    )
+    monkeypatch.setattr(
+        "extract_to_md.extractors.ocr_pdf_page",
+        lambda path, page, lang, dpi, psm: f"OCR text for page {page}",
+    )
+
+    text = extract_pdf(pdf, ExtractOptions(pdf_engine="auto"))
+
+    assert "<!-- extractor: pdf-auto -->" in text
+    assert "<!-- page-methods: 1:text, 2:ocr -->" in text
+    assert "page 2 text layer too sparse or noisy; used OCR" in text
+    assert "This page has a usable text layer for the agent." in text
+    assert "OCR text for page 2" in text
+
+
+def test_pdf_force_ocr_overrides_text_engine(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    pdf = tmp_path / "forced.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n%%EOF\n")
+    monkeypatch.setattr("extract_to_md.extractors.pdf_page_count", lambda path: 1)
+    monkeypatch.setattr(
+        "extract_to_md.extractors.ocr_pdf_page",
+        lambda path, page, lang, dpi, psm: "Forced OCR text",
+    )
+
+    text = extract_pdf(pdf, ExtractOptions(force_ocr=True, pdf_engine="text"))
+
+    assert "<!-- extractor: pdf-ocr -->" in text
+    assert "<!-- page-methods: 1:ocr -->" in text
+    assert "Forced OCR text" in text
+
+
+def test_pdf_auto_ocr_renders_all_pages_when_page_count_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    pdf = tmp_path / "unknown-pages.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n%%EOF\n")
+    monkeypatch.setattr("extract_to_md.extractors.pdf_page_count", lambda path: None)
+    monkeypatch.setattr("extract_to_md.extractors.extract_pdf_text_pages", lambda path, page_count=None: [])
+    monkeypatch.setattr(
+        "extract_to_md.extractors.ocr_pdf",
+        lambda path, lang, dpi, psm: "## Page 1\n\nFallback OCR text",
+    )
+
+    text = extract_pdf(pdf, ExtractOptions(pdf_engine="auto"))
+
+    assert "<!-- extractor: pdf-auto -->" in text
+    assert "page count unavailable; OCR rendered all pages" in text
+    assert "Fallback OCR text" in text
+
+
 def test_doctor_language_parser_accepts_tessdata_prefixed_output(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_run(cmd: list[str], check: bool = False, timeout_seconds=None):
         return subprocess.CompletedProcess(
@@ -139,4 +217,4 @@ def test_extract_any_text_sample_still_uses_public_options(tmp_path: Path) -> No
     sample.write_text("Agent quality baseline", encoding="utf-8")
 
     assert extract_any(sample, ExtractOptions()) == "Agent quality baseline"
-    assert __version__ == "0.3.0"
+    assert __version__ == "0.4.0"

@@ -30,6 +30,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--psm", type=int, default=6, help="Tesseract PSM mode, default: 6")
     parser.add_argument("--min-text-chars", type=int, default=80, help="Minimum text-layer characters before skipping OCR")
     parser.add_argument("--max-rows-per-sheet", type=int, default=500, help="Max rows per Excel sheet")
+    parser.add_argument(
+        "--pdf-engine",
+        choices=["auto", "text", "ocr"],
+        default="auto",
+        help="PDF extraction engine: auto, text, or ocr. Default: auto",
+    )
     parser.add_argument("--doctor", action="store_true", help="Check local tools and OCR language availability")
     parser.add_argument("--version", action="version", version=f"extract-to-md {__version__}")
     return parser
@@ -59,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
         psm=args.psm,
         min_text_chars=args.min_text_chars,
         max_rows_per_sheet=args.max_rows_per_sheet,
+        pdf_engine=args.pdf_engine,
     )
 
     try:

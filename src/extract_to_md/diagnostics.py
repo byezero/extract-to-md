@@ -67,6 +67,7 @@ def run_checks() -> list[CheckResult]:
             f"version {__version__}; Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         ),
         check_command("markitdown", ["--version"], "best-effort conversion fallback"),
+        check_command("pdfinfo", ["-v"], "PDF page counting"),
         check_command("pdftotext", ["-v"], "PDF text extraction"),
         check_command("pdftoppm", ["-v"], "PDF rendering for OCR"),
         check_command("tesseract", ["--version"], "image and scanned-document OCR"),

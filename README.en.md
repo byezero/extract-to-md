@@ -6,7 +6,7 @@
 Markdown for LLM and agent workflows.
 
 It can use [Microsoft MarkItDown](https://github.com/microsoft/markitdown) when
-available, while adding local extraction and OCR fallbacks for PDFs, scanned
+available, while adding local per-page PDF extraction, OCR fallbacks for scanned
 documents, images, PowerPoint decks, and bounded Excel output.
 
 ## Supported Formats
@@ -18,8 +18,8 @@ documents, images, PowerPoint decks, and bounded Excel output.
 | `.xlsx` | Extract worksheets as Markdown tables | None |
 | `.pptx` | Extract real slide text and speaker notes | None |
 | Image-heavy `.pptx` | Render to PDF, then OCR | `soffice`, `pdftoppm`, `tesseract` |
-| Text-layer `.pdf` | Use `pdftotext -layout` | Poppler `pdftotext` |
-| Scanned `.pdf` | Render pages and OCR | Poppler `pdftoppm`, `tesseract` |
+| Text-layer `.pdf` | Use `pdftotext -layout` per page | Poppler `pdfinfo`, `pdftotext` |
+| Scanned `.pdf` | Render pages and OCR | Poppler `pdfinfo`, `pdftoppm`, `tesseract` |
 | Images | OCR PNG, JPG, WebP, BMP, and TIFF | `tesseract` |
 | Other MarkItDown-supported formats | Best-effort fallback | Optional `markitdown` |
 
@@ -75,7 +75,7 @@ It checks:
 
 - the `extract-to-md` package
 - `markitdown`
-- `pdftotext` / `pdftoppm`
+- `pdfinfo` / `pdftotext` / `pdftoppm`
 - `tesseract`
 - OCR languages `chi_sim` / `eng`
 - `soffice`
@@ -88,6 +88,7 @@ You can also verify commands manually:
 ```powershell
 python --version
 uv --version
+pdfinfo -v
 pdftotext -v
 pdftoppm -v
 tesseract --version
@@ -126,6 +127,9 @@ extract-to-md --version
 extract-to-md input.pdf
 extract-to-md input.pdf -o output.md
 extract-to-md scanned.pdf --force-ocr -o scanned.md
+extract-to-md paper.pdf --pdf-engine auto -o paper.md
+extract-to-md paper.pdf --pdf-engine text -o paper.md
+extract-to-md scanned.pdf --pdf-engine ocr --dpi 400 --psm 6 -o scanned.md
 extract-to-md image.png --lang eng -o image.md
 extract-to-md deck.pptx --psm 11 -o deck.md
 extract-to-md workbook.xlsx --max-rows-per-sheet 200 -o workbook.md
@@ -141,6 +145,8 @@ Install Poppler and reopen your terminal:
 winget install -e --id oschwartz10612.Poppler
 pdftotext -v
 ```
+
+`pdfinfo` and `pdftoppm` come from the same Poppler package.
 
 ### Required tool not found: tesseract
 

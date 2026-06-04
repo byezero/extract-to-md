@@ -38,6 +38,7 @@ class ExtractOptions:
     psm: int = 6
     min_text_chars: int = 80
     max_rows_per_sheet: int = 500
+    pdf_engine: str = "auto"
 
 
 def format_output(path: Path, text: str) -> str:
@@ -276,14 +277,57 @@ def extract_xlsx(path: Path, max_rows_per_sheet: int = 500) -> str:
     return clean_text("\n".join(out))
 
 
-def extract_pdf_text(path: Path) -> str:
+def pdf_page_count(path: Path) -> int | None:
+    if not command_exists("pdfinfo"):
+        return None
+    result = run_command(["pdfinfo", str(path)], check=False)
+    text = result.stdout or result.stderr
+    match = re.search(r"^Pages:\s+(\d+)\s*$", text, flags=re.MULTILINE)
+    return int(match.group(1)) if match else None
+
+
+def split_pdf_text_output(text: str) -> list[str]:
+    pages = [clean_text(page) for page in text.split("\f")]
+    while pages and not pages[-1]:
+        pages.pop()
+    return pages
+
+
+def extract_pdf_text_pages(path: Path, page_count: int | None = None) -> list[str]:
     require_tool("pdftotext")
-    with tempfile.TemporaryDirectory() as td:
-        out = Path(td) / "out.txt"
-        run_command(["pdftotext", "-layout", str(path), str(out)], check=True)
-        if out.exists():
-            return clean_text(out.read_text(encoding="utf-8", errors="replace"))
-        return ""
+    result = run_command(["pdftotext", "-layout", str(path), "-"], check=True)
+    pages = split_pdf_text_output(result.stdout)
+    if page_count is not None:
+        if len(pages) < page_count:
+            pages.extend([""] * (page_count - len(pages)))
+        elif len(pages) > page_count:
+            pages = pages[:page_count]
+    return pages
+
+
+def extract_pdf_text(path: Path) -> str:
+    return clean_text("\n\n".join(extract_pdf_text_pages(path)))
+
+
+def usable_pdf_text(text: str, min_text_chars: int) -> bool:
+    compact_len = meaningful_len(text)
+    threshold = max(12, min(min_text_chars, 24))
+    if compact_len < threshold:
+        return False
+
+    useful_chars = re.findall(r"[0-9A-Za-z\u3400-\u9fff]", text)
+    if len(useful_chars) < 8 and compact_len < 40:
+        return False
+
+    bad_chars = text.count("\ufffd") + text.count("□")
+    if compact_len and bad_chars / compact_len > 0.1:
+        return False
+
+    control_chars = [ch for ch in text if ord(ch) < 32 and ch not in "\n\t"]
+    if compact_len and len(control_chars) / compact_len > 0.05:
+        return False
+
+    return True
 
 
 def ocr_image(path: Path, lang: str, psm: int) -> str:
@@ -323,12 +367,97 @@ def ocr_pdf(path: Path, lang: str, dpi: int, psm: int) -> str:
         return clean_text("\n".join(out))
 
 
+def ocr_pdf_page(path: Path, page: int, lang: str, dpi: int, psm: int) -> str:
+    require_tool("pdftoppm")
+    require_tool("tesseract")
+
+    with tempfile.TemporaryDirectory() as td:
+        prefix = Path(td) / "page"
+        run_command(
+            [
+                "pdftoppm",
+                "-f",
+                str(page),
+                "-l",
+                str(page),
+                "-r",
+                str(dpi),
+                "-png",
+                str(path),
+                str(prefix),
+            ],
+            check=True,
+        )
+
+        pages = sorted(Path(td).glob("page-*.png"), key=page_key)
+        if not pages:
+            return ""
+        return ocr_image(pages[0], lang=lang, psm=psm)
+
+
+def pdf_report_comments(engine: str, page_methods: list[str], warnings: list[str]) -> str:
+    lines = [
+        f"<!-- extractor: pdf-{engine} -->",
+        f"<!-- pages: {len(page_methods)} -->",
+        f"<!-- page-methods: {', '.join(page_methods)} -->",
+    ]
+    if warnings:
+        lines.append(f"<!-- warnings: {'; '.join(warnings)} -->")
+    return "\n".join(lines)
+
+
 def extract_pdf(path: Path, options: ExtractOptions) -> str:
-    if not options.force_ocr:
-        text = extract_pdf_text(path)
-        if meaningful_len(text) >= options.min_text_chars:
-            return text
-    return ocr_pdf(path, lang=options.lang, dpi=options.dpi, psm=options.psm)
+    engine = "ocr" if options.force_ocr else options.pdf_engine
+    if engine not in {"auto", "text", "ocr"}:
+        raise ExtractToMdError(f"Unsupported PDF engine: {engine}")
+
+    page_count = pdf_page_count(path)
+    text_pages: list[str] = []
+    if engine in {"auto", "text"}:
+        text_pages = extract_pdf_text_pages(path, page_count=page_count)
+
+    if page_count is None:
+        page_count = len(text_pages)
+
+    if page_count == 0 and engine in {"auto", "ocr"}:
+        ocr_text = ocr_pdf(path, lang=options.lang, dpi=options.dpi, psm=options.psm)
+        methods = ["ocr"] * len(re.findall(r"^## Page ", ocr_text, flags=re.MULTILINE))
+        if not methods:
+            methods = ["ocr"]
+        report = pdf_report_comments(engine, methods, ["page count unavailable; OCR rendered all pages"])
+        return clean_text(f"{report}\n\n{ocr_text}")
+
+    out = []
+    page_methods = []
+    warnings = []
+
+    for page in range(1, page_count + 1):
+        text = text_pages[page - 1] if page - 1 < len(text_pages) else ""
+        method = "text"
+
+        if engine == "ocr":
+            method = "ocr"
+            text = ocr_pdf_page(path, page, lang=options.lang, dpi=options.dpi, psm=options.psm)
+        elif engine == "auto" and not usable_pdf_text(text, options.min_text_chars):
+            method = "ocr"
+            warnings.append(f"page {page} text layer too sparse or noisy; used OCR")
+            text = ocr_pdf_page(path, page, lang=options.lang, dpi=options.dpi, psm=options.psm)
+        elif engine == "text" and not text:
+            warnings.append(f"page {page} has no text-layer text")
+
+        if not clean_text(text):
+            warnings.append(f"page {page} produced no text")
+            text = "_No text found._"
+
+        page_methods.append(f"{page}:{method}")
+        out.append(f"## Page {page}")
+        out.append("")
+        out.append(clean_text(text))
+        out.append("")
+
+    body = clean_text("\n".join(out))
+    report = pdf_report_comments(engine, page_methods, warnings)
+    return clean_text(f"{report}\n\n{body}")
 
 
 def extract_pptx_with_ocr_fallback(path: Path, options: ExtractOptions) -> str:

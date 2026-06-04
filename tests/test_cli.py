@@ -128,8 +128,15 @@ def test_version_outputs_current_version(capsys: pytest.CaptureFixture[str]) -> 
         cli.main(["--version"])
 
     assert exc.value.code == 0
-    assert __version__ == "0.3.0"
-    assert "extract-to-md 0.3.0" in capsys.readouterr().out
+    assert __version__ == "0.4.0"
+    assert "extract-to-md 0.4.0" in capsys.readouterr().out
+
+
+def test_pdf_engine_argument_is_accepted(tmp_path: Path) -> None:
+    source = tmp_path / "sample.txt"
+    source.write_text("Hello", encoding="utf-8")
+
+    assert cli.main([str(source), "--pdf-engine", "ocr"]) == 0
 
 
 def test_doctor_reports_ok_and_warn(monkeypatch: pytest.MonkeyPatch) -> None:
