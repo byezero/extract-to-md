@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "extract-to-md"
-version = "0.2.1"
+version = "0.3.0"
 description = "A local-first document-to-Markdown extractor with OCR fallbacks."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -40,3 +40,10 @@ extract-to-md = "extract_to_md.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/extract_to_md"]
+
+[tool.pytest.ini_options]
+addopts = ["-m", "not integration"]
+markers = [
+  "integration: tests that may use local external tools",
+  "external_tools: tests that require optional command-line tools such as Poppler, Tesseract, or LibreOffice"
+]

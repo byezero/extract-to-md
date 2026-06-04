@@ -177,6 +177,26 @@ uv run --extra dev python -m pytest
 uv build
 ```
 
+### Quality and Local Regression Tests
+
+The default test suite generates minimal `.docx`, `.xlsx`, and `.pptx` samples
+in temporary directories. It does not commit real business documents and does
+not require Poppler, Tesseract, or LibreOffice:
+
+```powershell
+uv run --extra dev python -m pytest
+```
+
+To validate the local external toolchain, run integration tests separately.
+Tests skip themselves when a required tool is missing:
+
+```powershell
+uv run --extra dev python -m pytest -m integration
+```
+
+Integration tests cover Poppler text-layer PDF extraction, Tesseract language
+parsing, and the LibreOffice PPTX OCR fallback path when `soffice` is present.
+
 ## License
 
 MIT

@@ -128,8 +128,8 @@ def test_version_outputs_current_version(capsys: pytest.CaptureFixture[str]) -> 
         cli.main(["--version"])
 
     assert exc.value.code == 0
-    assert __version__ == "0.2.1"
-    assert "extract-to-md 0.2.1" in capsys.readouterr().out
+    assert __version__ == "0.3.0"
+    assert "extract-to-md 0.3.0" in capsys.readouterr().out
 
 
 def test_doctor_reports_ok_and_warn(monkeypatch: pytest.MonkeyPatch) -> None:

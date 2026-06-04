@@ -270,6 +270,22 @@ python src\extract_to_md\cli.py --doctor
 uv run --extra dev python -m pytest
 ```
 
+### 质量测试 / 本地回归测试
+
+默认测试会在临时目录里生成最小 `.docx`、`.xlsx`、`.pptx` 等样本，不会提交真实业务文档，也不依赖 Poppler、Tesseract 或 LibreOffice：
+
+```powershell
+uv run --extra dev python -m pytest
+```
+
+如果想验证本机外部工具链，可以额外运行集成测试。缺少对应工具时测试会自动跳过：
+
+```powershell
+uv run --extra dev python -m pytest -m integration
+```
+
+集成测试会覆盖文本层 PDF 的 Poppler 提取、Tesseract 语言包解析，以及 LibreOffice 存在时 PPTX OCR fallback 不报错。
+
 构建包：
 
 ```powershell
