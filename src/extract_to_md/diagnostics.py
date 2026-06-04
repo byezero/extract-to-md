@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import sys
 
 from . import __version__
-from .utils import command_exists, run_command
+from .utils import command_exists, command_path, run_command
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,13 @@ def check_command(cmd: str, version_args: list[str], purpose: str) -> CheckResul
     detail = _version_detail(cmd, version_args)
     status = "WARN" if "timed out" in detail or "failed" in detail else "OK"
     return CheckResult(status, cmd, detail)
+
+
+def check_presence_only(cmd: str, purpose: str) -> CheckResult:
+    path = command_path(cmd)
+    if not path:
+        return CheckResult("WARN", cmd, f"not found; needed for {purpose}")
+    return CheckResult("OK", cmd, f"available at {path}")
 
 
 def tesseract_languages() -> set[str]:
@@ -74,7 +81,7 @@ def run_checks() -> list[CheckResult]:
         else:
             checks.append(CheckResult("WARN", f"lang:{lang}", "not found in tesseract --list-langs"))
 
-    checks.append(check_command("soffice", ["--version"], "PowerPoint OCR fallback"))
+    checks.append(check_presence_only("soffice", "PowerPoint OCR fallback"))
     return checks
 
 

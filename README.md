@@ -88,7 +88,7 @@ pdftotext -v
 pdftoppm -v
 tesseract --version
 tesseract --list-langs
-soffice --version
+Get-Command soffice
 ```
 
 如果 `tesseract --list-langs` 里没有 `chi_sim`，需要安装简体中文语言数据。常见做法是把 `chi_sim.traineddata` 放到 Tesseract 的 `tessdata` 目录。
@@ -235,7 +235,7 @@ winget install -e --id TheDocumentFoundation.LibreOffice
 然后新开终端确认：
 
 ```powershell
-soffice --version
+Get-Command soffice
 ```
 
 ### 输出 Markdown 开头的注释是什么？

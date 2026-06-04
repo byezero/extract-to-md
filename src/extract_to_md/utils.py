@@ -56,6 +56,10 @@ def command_exists(cmd: str) -> bool:
     return shutil.which(cmd) is not None
 
 
+def command_path(cmd: str) -> str | None:
+    return shutil.which(cmd)
+
+
 def require_tool(cmd: str, purpose: str | None = None) -> None:
     if not command_exists(cmd):
         raise MissingToolError(cmd, purpose)

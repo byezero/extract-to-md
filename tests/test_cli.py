@@ -123,13 +123,13 @@ def test_command_failed_error_contains_command_code_and_stderr(monkeypatch: pyte
     assert "bad thing happened" in message
 
 
-def test_version_outputs_v020(capsys: pytest.CaptureFixture[str]) -> None:
+def test_version_outputs_current_version(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
         cli.main(["--version"])
 
     assert exc.value.code == 0
-    assert __version__ == "0.2.0"
-    assert "extract-to-md 0.2.0" in capsys.readouterr().out
+    assert __version__ == "0.2.1"
+    assert "extract-to-md 0.2.1" in capsys.readouterr().out
 
 
 def test_doctor_reports_ok_and_warn(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -144,6 +144,10 @@ def test_doctor_reports_ok_and_warn(monkeypatch: pytest.MonkeyPatch) -> None:
         return subprocess.CompletedProcess(cmd, 0, f"{cmd[0]} version", "")
 
     monkeypatch.setattr("extract_to_md.diagnostics.command_exists", fake_exists)
+    monkeypatch.setattr(
+        "extract_to_md.diagnostics.command_path",
+        lambda cmd: f"/mock/bin/{cmd}" if cmd in available else None,
+    )
     monkeypatch.setattr("extract_to_md.diagnostics.run_command", fake_run)
 
     report = doctor_report()

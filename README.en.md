@@ -92,7 +92,7 @@ pdftotext -v
 pdftoppm -v
 tesseract --version
 tesseract --list-langs
-soffice --version
+Get-Command soffice
 ```
 
 If `chi_sim` is missing, install Simplified Chinese Tesseract language data and
@@ -163,7 +163,7 @@ Install LibreOffice so `soffice` is available:
 
 ```powershell
 winget install -e --id TheDocumentFoundation.LibreOffice
-soffice --version
+Get-Command soffice
 ```
 
 ## Development
